@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+  <title>Vertical Playground</title>
+
+  <!-- <script src="../blockly_uncompressed_vertical.js"></script>
+  <script src="../msg/messages.js"></script>
+  <script src="../generators/gogocode.js"></script>
+  <script src="../blocks_tinker/gogoblocks.js"></script>
+  <script src="../blocks_tinker/vertical_extensions.js"></script>
+  <script src="../blocks_tinker/event.js"></script>
+  <script src="../blocks_tinker/procedures.js"></script>
+  <script src="../blocks_tinker/data.js"></script>
+  <script src="../blocks_tinker/default_toolbox.js"></script> -->
+
+  <!-- <script src="../blocks_common/math.js"></script> -->
+  <!-- <script src="../blocks_common/text.js"></script> -->
+  <!-- <script src="../blocks_common/colour.js"></script> -->
+  <!-- <script src="../blocks_vertical/control.js"></script> -->
+  <!-- <script src="../blocks_vertical/motion.js"></script> -->
+  <!-- <script src="../blocks_vertical/looks.js"></script> -->
+  <!-- <script src="../blocks_vertical/operators.js"></script> -->
+  <!-- <script src="../blocks_vertical/pen.js"></script> -->
+  <!-- <script src="../blocks_vertical/sound.js"></script> -->
+  <!-- <script src="../blocks_vertical/sensing.js"></script> -->
+
+  <script src="blockly_compressed_vertical.js"></script>
+  <!-- <script src="../blocks_compressed.js"></script> -->
+  <script src="blocks_compressed_tinker.js"></script>
+  <script src="gogocode_compressed.js"></script>
+  <script src="en.js"></script>
+
+  <link rel="stylesheet" type="text/css" href="tinker.css">
+
+  <script>
+    'use strict';
+
+    var fakeDragStack = [];
+    var workspace = null;
+
+    function onWorkspaceChange(item) {
+      var output = document.getElementById('importExport');
+      var logospace = document.getElementById('gogoCode');
+      var code = filterCode(Blockly.GogoCode.workspaceToCode(workspace));
+      // console.log(code);
+      output.value = code;
+
+      logospace.innerHTML = code;
+
+      autosaveBlock();
+      // console.log(output.value);
+      taChange();
+    }
+
+    function changeTab(evt, id) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(id).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+
+    function autosaveBlock() {
+      var xml = Blockly.Xml.workspaceToDom(Blockly.mainWorkspace);
+      var data = Blockly.Xml.domToText(xml);
+
+      // Store data in blob.
+      window.localStorage.setItem('autoSaveBlock', data);
+    }
+
+    function autoloadBlock() {
+
+      console.log('-- Loading saved code.')
+      var xml = Blockly.Xml.textToDom('<xml><block type="procedure_procedure" x="250" y="50"><title name="pname">main</title></block></xml>');
+      xml.editable = false;
+      xml.deletable = false;
+      workspace.clear();
+      Blockly.Xml.domToWorkspace(xml, workspace);
+
+      //return;
+
+      var loadedBlock = window.localStorage.getItem('autoSaveBlock');
+      //alert(loadedBlock.split('procedure_procedure')[1]);
+      if (!loadedBlock) return;
+      if (!(loadedBlock.split('procedure_procedure')[1])) {
+        loadedBlock = loadedBlock.split('</xml>')[0] + '<block type="procedure_procedure" x="100" y="50"><title name="pname">main</title></block></xml>';
+      }
+      try {
+        var xml = Blockly.Xml.textToDom(loadedBlock);
+      } catch (e) {
+
+        return;
+      }
+      if (xml.childElementCount == 0) return;
+      workspace.clear();
+      Blockly.Xml.domToWorkspace(xml, workspace);
+    }
+
+    function filterCode(code) {
+      var codeArr;
+      codeArr = code.split('[p]');
+      codeArr.shift();
+
+      var proc = [];
+
+      codeArr.forEach(function (item) {
+        var str = item.split('[/p]')[0];
+
+        var strTmp = str.split('@@');
+        str = strTmp[0] + (strTmp[2] ? strTmp[2] : '');
+
+        var varArr0 = strTmp[1] ? strTmp[1].split(',') : [];
+        var varArr = [];
+        var variables = str.split('[:]');
+        variables.shift();
+        variables.forEach(function (item2) {
+          varArr.pushIfNotExist(item2.split('[;]')[0].split(':')[0]);
+        }, this);
+
+        varArr0.forEach(function (item4) {
+          varArr.erase(item4);
+        }, this);
+
+        var newVar = '';
+
+        varArr.forEach(function (item3) {
+          newVar += '  <span class="c330">set ' + item3 + ' 0</span>\n';
+        }, this);
+        var str2 = str.replace('[SS]', newVar).replace(/\[:\]/g, '').replace(/\[;\]/g, '');
+        proc.push(str2);
+      }, this);
+
+      code = proc.pop() + '@@';
+      code += proc.join('@@');
+
+      codeArr = code.split('\n');
+      clean(codeArr);
+      // codeArr = codeArr.filter(function (item, index) {
+      //   return (clean(item) != '');
+      // });
+      return codeArr.join('\n').replace(/@@/g, '\n\n');
+    }
+
+    function clean(arr) {
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i] == null || arr[i] == undefined) {
+          arr.splice(i, 1);
+        };
+      };
+      return arr;
+    }
+
+    // check if an element exists in array using a comparer function
+    // comparer : function(currentElement)
+    Array.prototype.inArray = function (comparer) {
+      for (var i = 0; i < this.length; i++) {
+        if (comparer(this[i])) return true;
+      }
+      return false;
+    };
+
+    // adds an element to the array if it does not already exist using a comparer 
+    // function
+    Array.prototype.pushIfNotExist = function (element, comparer) {
+      if (!this.inArray(comparer)) {
+        this.push(element);
+      }
+    };
+
+    // var array = [{ name: "tom", text: "tasty" }];
+    // var element = { name: "tom", text: "tasty" };
+    // array.pushIfNotExist(element, function (e) {
+    //   return e.name === element.name && e.text === element.text;
+    // });
+
+    function start() {
+
+      var soundsEnabled = 1;
+      if (sessionStorage) {
+        // Restore sounds state.
+        soundsEnabled = sessionStorage.getItem('soundsEnabled');
+        if (soundsEnabled === null) {
+          soundsEnabled = true;
+        } else {
+          soundsEnabled = (soundsEnabled === 'true');
+        }
+      } else {
+        soundsEnabled = true;
+      }
+      // setSoundsEnabled(soundsEnabled);
+
+      // Setup blocks
+      // Parse the URL arguments.
+      var match = location.search.match(/dir=([^&]+)/);
+      var rtl = match && match[1] == 'rtl';
+      document.forms.options.elements.dir.selectedIndex = Number(rtl);
+      var toolbox_name = getToolboxElement();
+      var toolbox = document.getElementById('toolbox-' + toolbox_name);
+      // console.log(toolbox_name);
+      if (toolbox_name == 'tinker') {
+        document.forms.options.elements.toolbox.selectedIndex = 2;
+      } else if (toolbox_name == 'simple') {
+        document.forms.options.elements.toolbox.selectedIndex = 1;
+      } else if (toolbox_name == null) {
+        document.forms.options.elements.toolbox.selectedIndex = 0;
+      }
+
+      match = location.search.match(/side=([^&]+)/);
+
+      var side = match ? match[1] : 'start';
+
+      document.forms.options.elements.side.value = side;
+
+      // Create main workspace.
+      workspace = Blockly.inject('blocklyDiv', {
+        comments: false,
+        disable: false,
+        collapse: false,
+        media: 'media/',
+        readOnly: false,
+        rtl: rtl,
+        scrollbars: true,
+        trashcan: true,
+        toolbox: toolbox,
+        toolboxPosition: side == 'top' || side == 'start' ? 'start' : 'end',
+        horizontalLayout: side == 'top' || side == 'bottom',
+        sounds: soundsEnabled,
+        zoom: {
+          controls: true,
+          wheel: true,
+          startScale: 0.75,
+          maxScale: 4,
+          minScale: 0.25,
+          scaleSpeed: 1.1
+        },
+        colours: {
+          fieldShadow: 'rgba(255, 255, 255, 0.3)',
+          dragShadowOpacity: 0.6
+        }
+      });
+
+      workspace.addChangeListener(e => onWorkspaceChange(e));
+
+      autoloadBlock();
+
+      if (sessionStorage) {
+        // Restore previously displayed text.
+        var text = sessionStorage.getItem('textarea');
+        if (text) {
+          document.getElementById('importExport').value = text;
+        }
+        taChange();
+      }
+
+      if (sessionStorage) {
+        // Restore event logging state.
+        var state = sessionStorage.getItem('logEvents');
+        // logEvents(Boolean(state));
+
+        // Restore flyout event logging state.
+        state = sessionStorage.getItem('logFlyoutEvents');
+        // logFlyoutEvents(Boolean(state));
+      }
+    }
+
+    function getToolboxElement() {
+      var match = location.search.match(/toolbox=([^&]+)/);
+      // return document.getElementById('toolbox-' + (match ? match[1] : 'categories'));
+      return (match ? match[1] : 'categories');
+    }
+
+    function toXml() {
+      var output = document.getElementById('importExport');
+      var xml = Blockly.Xml.workspaceToDom(workspace);
+      output.value = Blockly.Xml.domToPrettyText(xml);
+      output.focus();
+      output.select();
+      taChange();
+    }
+
+    function fromXml() {
+      var input = document.getElementById('importExport');
+      var xml = Blockly.Xml.textToDom(input.value);
+      Blockly.Xml.domToWorkspace(xml, workspace);
+      taChange();
+    }
+
+    function toCode(lang) {
+      var output = document.getElementById('importExport');
+      output.value = Blockly[lang].workspaceToCode(workspace);
+      taChange();
+    }
+
+    // Disable the "Import from XML" button if the XML is invalid.
+    // Preserve text between page reloads.
+    function taChange() {
+      var textarea = document.getElementById('importExport');
+      if (sessionStorage) {
+        sessionStorage.setItem('textarea', textarea.value)
+      }
+      var valid = true;
+      try {
+        Blockly.Xml.textToDom(textarea.value);
+      } catch (e) {
+        valid = false;
+      }
+      document.getElementById('import').disabled = !valid;
+    }
+
+    function logEvents(state) {
+      var checkbox = document.getElementById('logCheck');
+      checkbox.checked = state;
+      if (sessionStorage) {
+        sessionStorage.setItem('logEvents', state ? 'checked' : '');
+      }
+      if (state) {
+        workspace.addChangeListener(logger);
+      } else {
+        workspace.removeChangeListener(logger);
+      }
+    }
+
+    function logFlyoutEvents(state) {
+      var checkbox = document.getElementById('logFlyoutCheck');
+      checkbox.checked = state;
+      var soundsEnabled = null;
+      if (sessionStorage) {
+        sessionStorage.setItem('logFlyoutEvents', state ? 'checked' : '');
+      }
+      var flyoutWorkspace = (workspace.flyout_) ? workspace.flyout_.workspace_ :
+        workspace.toolbox_.flyout_.workspace_;
+      if (state) {
+        flyoutWorkspace.addChangeListener(logger);
+      } else {
+        flyoutWorkspace.removeChangeListener(logger);
+      }
+    }
+
+    function logger(e) {
+      console.log(e);
+    }
+
+    function glowBlock() {
+      if (Blockly.selected) {
+        workspace.glowBlock(Blockly.selected.id, true);
+      }
+    }
+
+    function unglowBlock() {
+      if (Blockly.selected) {
+        workspace.glowBlock(Blockly.selected.id, false);
+      }
+    }
+
+    function glowStack() {
+      if (Blockly.selected) {
+        workspace.glowStack(Blockly.selected.id, true);
+      }
+    }
+
+    function unglowStack() {
+      if (Blockly.selected) {
+        workspace.glowStack(Blockly.selected.id, false);
+      }
+    }
+
+    function sprinkles(n) {
+      var prototypes = [];
+      var toolbox = workspace.options.languageTree;
+      if (!toolbox) {
+        console.error('Toolbox not found; add a toolbox element to the DOM.');
+        return;
+      }
+      var blocks = toolbox.getElementsByTagName('block');
+      for (var i = 0; i < n; i++) {
+        var blockXML = blocks[Math.floor(Math.random() * blocks.length)];
+        var block = Blockly.Xml.domToBlock(blockXML, workspace);
+        block.initSvg();
+        block.moveBy(
+          Math.round(Math.random() * 450 + 40),
+          Math.round(Math.random() * 600 + 40)
+        );
+      }
+    }
+
+    var equalsXml = [
+      '  <shadow type="operator_equals">',
+      '    <value name="OPERAND1">',
+      '     <shadow type="text">',
+      '      <field name="TEXT">foo</field>',
+      '     </shadow>',
+      '    </value>',
+      '    <value name="OPERAND2">',
+      '      <shadow type="operator_equals"></shadow>',
+      '    </value>',
+      '  </shadow>'
+    ].join('\n');
+
+    var spaghettiXml = [
+      '  <block type="control_if_else">',
+      '    <value name="CONDITION">',
+      '      <shadow type="operator_equals"></shadow>',
+      '    </value>',
+      '    <statement name="SUBSTACK"></statement>',
+      '    <statement name="SUBSTACK2"></statement>',
+      '    <next></next>',
+      '  </block>'
+    ].join('\n');
+
+    function spaghetti(n) {
+      console.log("Starting spaghetti.  This may take some time...");
+      var xml = spaghettiXml;
+      // Nest if/else statements deeply.
+      for (var i = 0; i < 2 * n; i++) {
+        xml = xml.replace(/(<statement name="SUBSTACK2?"?>)<\//g,
+          '$1' + spaghettiXml + '</');
+      }
+      // Stack a bit.
+      for (var i = 0; i < n; i++) {
+        xml = xml.replace(/(<next>)<\//g,
+          '$1' + spaghettiXml + '</');
+      }
+
+      // Nest boolean comparisons.
+      var equalsBlock = equalsXml;
+      for (var i = 0; i < n; i++) {
+        equalsBlock = equalsBlock.replace(
+          /(<shadow( type="operator_equals")?>)<\/shadow>/g, equalsXml);
+      }
+
+      // Put the nested boolean comparisons into if/else statements.
+      xml = xml.replace(/(<shadow( type="operator_equals")?>)<\/shadow>/g,
+        equalsBlock);
+
+      xml = '<xml xmlns="http://www.w3.org/1999/xhtml">' + xml + '</xml>';
+      var dom = Blockly.Xml.textToDom(xml);
+      console.time('Spaghetti domToWorkspace');
+      Blockly.Xml.domToWorkspace(dom, workspace);
+      console.timeEnd('Spaghetti domToWorkspace');
+    }
+
+    // function setSoundsEnabled(state) {
+    //   var checkbox = document.getElementById('soundsEnabled');
+    //   checkbox.checked = (state) ? 'checked' : '';
+    //   if (sessionStorage) {
+    //     sessionStorage.setItem('soundsEnabled', state);
+    //   }
+    // }
+
+    function fakeDrag(id, dx, dy, opt_workspace) {
+      var ws = opt_workspace || Blockly.getMainWorkspace();
+      var blockToDrag = ws.getBlockById(id);
+
+      if (!blockToDrag) {
+        fakeDragWrapper();
+        return;
+      }
+      var blockTop = blockToDrag.svgGroup_.getBoundingClientRect().top;
+      var blockLeft = blockToDrag.svgGroup_.getBoundingClientRect().left;
+
+      // Click somewhere on the block.
+      var mouseDownEvent = new MouseEvent('mousedown',
+        { clientX: blockLeft + 5, clientY: blockTop + 5 });
+      blockToDrag.onMouseDown_(mouseDownEvent);
+
+      // Throw in a move for good measure.
+      setTimeout(
+        function () {
+          var mouseMoveEvent = new MouseEvent('mousemove',
+            {
+              clientX: blockLeft + dx,
+              clientY: blockTop + dy
+            });
+          blockToDrag.onMouseMove_(mouseMoveEvent);
+
+          // Drop at dx, dy.
+          setTimeout(
+            function () {
+              var mouseUpEvent = new MouseEvent('mouseup',
+                {
+                  clientX: blockLeft + dx,
+                  clientY: blockTop + dy
+                });
+              blockToDrag.onMouseUp_(mouseUpEvent);
+
+              setTimeout(fakeDragWrapper(), 100);
+            }, 30);
+        }, 30);
+    };
+
+    function fakeDragWrapper() {
+      var dragInfo = fakeDragStack.pop();
+      if (dragInfo) {
+        fakeDrag(dragInfo.id, dragInfo.dx, dragInfo.dy, dragInfo.workspace);
+      }
+    }
+
+    function fakeManyDrags() {
+      var blockList = workspace.getAllBlocks();
+      for (var i = 0; i < 2 * blockList.length; i++) {
+        fakeDragStack.push(
+          {
+            id: blockList[Math.round(Math.random() * (blockList.length - 1))].id,
+            // Move some blocks up and to the left, but mostly down and to the right.
+            dx: Math.round((Math.random() - 0.25) * 200),
+            dy: Math.round((Math.random() - 0.25) * 200),
+            workspace: workspace
+          });
+      }
+      fakeDragWrapper();
+    }
+
+    function reportDemo() {
+      if (Blockly.selected) {
+        workspace.reportValue(
+          Blockly.selected.id,
+          document.getElementById('reportValue').value
+        );
+      }
+    }
+  </script>
+
+  <style>
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      background-color: #fff;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+
+    h1 {
+      font-weight: normal;
+      font-size: 140%;
+    }
+
+    #blocklyDiv {
+      float: left;
+      height: 95%;
+      width: 100%;
+    }
+
+    #collaborators {
+      float: right;
+      width: 30px;
+      margin-left: 10px;
+    }
+
+    #collaborators>img {
+      margin-right: 5px;
+      height: 30px;
+      padding-bottom: 5px;
+      width: 30px;
+      border-radius: 3px;
+    }
+
+    #importExport {
+      font-family: monospace;
+    }
+    /* body {
+      font-family: "Lato", sans-serif;
+    } */
+    /* Style the tab */
+
+    div.tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+    }
+    /* Style the buttons inside the tab */
+
+    div.tab button {
+      background-color: inherit;
+      float: left;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      transition: 0.3s;
+      font-size: 17px;
+    }
+    /* Change background color of buttons on hover */
+
+    div.tab button:hover {
+      background-color: #ddd;
+    }
+    /* Create an active/current tablink class */
+
+    div.tab button.active {
+      background-color: #ccc;
+    }
+    /* Style the tab content */
+
+    .tabcontent {
+      display: none;
+      padding: 6px 12px;
+      -webkit-animation: fadeEffect 1s;
+      animation: fadeEffect 1s;
+    }
+    /* Fade in tabs */
+
+    @-webkit-keyframes fadeEffect {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeEffect {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+
+<body onload="start()">
+  <div id="collaborators"></div>
+  <!-- <div id=""></div> -->
+  <div class="tab">
+    <button class="tablinks" onclick="changeTab(event, 'blocklyDiv')" id="block">Blockly</button>
+    <button class="tablinks" onclick="changeTab(event, 'gogoSpace')">Logo Code</button>
+    <button class="tablinks" onclick="changeTab(event, 'Setting')">Setting</button>
+  </div>
+
+  <div id="blocklyDiv" class="tabcontent"></div>
+
+  <div id="gogoSpace" class="tabcontent">
+    <pre id="gogoCode" contenteditable="true"></pre>
+  </div>
+
+  <div id="Setting" class="tabcontent">
+    Sidebar
+    <h1>Vertical Blocks</h1>
+    <p>
+      <a href="javascript:void(workspace.setVisible(true))">Show</a> - <a href="javascript:void(workspace.setVisible(false))">Hide</a>
+    </p>
+
+    <form id="options">
+      <select name="dir" onchange="document.forms.options.submit()">
+            <option value="ltr">LTR</option>
+            <option value="rtl">RTL</option>
+          </select>
+      <select name="toolbox" onchange="document.forms.options.submit()">
+            <option value="categories">Categories</option>
+            <option value="simple">Simple</option>
+            <option value="tinker">Tinker</option>
+          </select>
+      <select name="side" onchange="document.forms.options.submit()">
+            <option value="start">Start</option>
+            <option value="end">End</option>
+            <option value="top">Top</option>
+            <option value="bottom">Bottom</option>
+          </select>
+    </form>
+
+    <p>
+      <input type="button" value="Export to XML" onclick="toXml()"> &nbsp;
+      <input type="button" value="Import from XML" onclick="fromXml()" id="import">
+      <br>
+      <!-- <input type="button" value="To JavaScript" onclick="toCode('JavaScript')"> -->
+      <br>
+      <input type="button" value="To LogoCode" onclick="toCode('GogoCode')">
+      <br>
+      <textarea id="importExport" style="width: 26%; height: 12em" onchange="taChange();" onkeyup="taChange()"></textarea>
+    </p>
+  </div>
+
+  <!-- Gogo toolbox -->
+  <xml id="toolbox-tinker" style="display: none">
+    <category name="Common Blocks" colour="#F44336" secondaryColour="#FF1744">
+      <block type="math_number" x="-4" y="201">
+        <title name="number">500</title>
+      </block>
+      <block type="input_sensor" x="-9" y="170">
+        <title name="sensor">1</title>
+      </block>
+      <block type="math_equal" id="32" inline="true">
+        <field name="cond">&gt;</field>
+        <value name="left">
+          <block type="input_sensor" id="53">
+            <field name="sensor">1</field>
+          </block>
+        </value>
+        <value name="right">
+          <block type="math_number" id="68">
+            <field name="number">500</field>
+          </block>
+        </value>
+      </block>
+      <block type="action_beep" x="40" y="98"></block>
+      <block type="display_number">
+        <value name="value">
+          <block type="math_number">
+            <title name="number">1</title>
+          </block>
+        </value>
+      </block>
+      <block type="action_wait">
+        <value name="NAME">
+          <block type="math_number">
+            <title name="number">1</title>
+          </block>
+        </value>
+      </block>
+      <block type="action_motor" x="26" y="265"></block>
+      <block type="motor_action_turn" x="34" y="229">
+        <title name="turn">on</title>
+      </block>
+      <block type="motor_action_thisway" x="119" y="159">
+        <title name="clockwise">cw</title>
+      </block>
+      <block type="control_if" inline="false" x="78" y="56">
+        <value name="condition">
+          <block type="math_equal" id="32" inline="true">
+            <field name="cond">&gt;</field>
+            <value name="left">
+              <block type="input_sensor" id="53">
+                <field name="sensor">1</field>
+              </block>
+            </value>
+            <value name="right">
+              <block type="math_number" id="68">
+                <field name="number">500</field>
+              </block>
+            </value>
+          </block>
+        </value>
+      </block>
+      <block id="block_control_ifelse" type="control_ifelse" inline="false" x="72" y="152">
+        <value name="condition">
+          <block type="math_equal" id="32" inline="true">
+            <field name="cond">&gt;</field>
+            <value name="left">
+              <block type="input_sensor" id="53">
+                <field name="sensor">1</field>
+              </block>
+            </value>
+            <value name="right">
+              <block type="math_number" id="68">
+                <field name="number">500</field>
+              </block>
+            </value>
+          </block>
+        </value>
+      </block>
+      <!--<block type="control_if_state_change" inline="false" ></block>-->
+      <block type="control_forever" x="247" y="450"></block>
+    </category>
+    <category name="Program Control" colour="#FF7E21" secondaryColour="#FF9100">
+      <block type="control_forever_wait" x="94" y="432">
+        <value name="NAME">
+          <block type="math_number" id="11">
+            <field name="number">1</field>
+          </block>
+        </value>
+
+      </block>
+      <block type="control_forever" x="94" y="432"></block>
+      <block type="control_repeat" inline="true" x="86" y="323">
+        <value name="times">
+          <block type="math_number">
+            <title name="number">10</title>
+          </block>
+        </value>
+      </block>
+      <block type="control_if">
+        <value name="condition">
+          <block type="math_equal">
+            <field name="cond">&gt;</field>
+            <value name="left">
+              <block type="input_sensor">
+                <field name="sensor">1</field>
+              </block>
+            </value>
+            <value name="right">
+              <block type="math_number">
+                <field name="number">500</field>
+              </block>
+            </value>
+          </block>
+        </value>
+      </block>
+      <block id="block_control_ifelse" type="control_ifelse" inline="false" x="72" y="152">
+        <value name="condition">
+          <block type="math_equal" id="32" inline="true">
+            <field name="cond">&gt;</field>
+            <value name="left">
+              <block type="input_sensor" id="53">
+                <field name="sensor">1</field>
+              </block>
+            </value>
+            <value name="right">
+              <block type="math_number" id="68">
+                <field name="number">500</field>
+              </block>
+            </value>
+          </block>
+        </value>
+      </block>
+      <block type="control_if_state_change" inline="false">
+        <value name="condition">
+          <block type="math_equal" id="32" inline="true">
+            <field name="cond">&gt;</field>
+            <value name="left">
+              <block type="input_sensor" id="53">
+                <field name="sensor">1</field>
+              </block>
+            </value>
+            <value name="right">
+              <block type="math_number" id="68">
+                <field name="number">500</field>
+              </block>
+            </value>
+          </block>
+        </value>
+      </block>
+      <block type="control_waituntil" inline="false" x="87" y="274">
+        <value name="CONDITION">
+          <block type="math_equal" id="32" inline="true">
+            <field name="cond">&gt;</field>
+            <value name="left">
+              <block type="input_sensor" id="53">
+                <field name="sensor">1</field>
+              </block>
+            </value>
+            <value name="right">
+              <block type="math_number" id="68">
+                <field name="number">500</field>
+              </block>
+            </value>
+          </block>
+        </value>
+      </block>
+      <block type="procedure_stop"></block>
+      <block type="action_settickrate">
+        <value name="NAME">
+          <block type="math_number">
+            <title name="number">10</title>
+          </block>
+        </value>
+        <next>
+          <block type="control_when_ticked" x="94" y="432"></block>
+        </next>
+      </block>
+      <block type="control_if_ticked" x="94" y="432"></block>
+    </category>
+    <category name="Math" colour="#FFAB00" secondaryColour="#FFEB3B">
+      <block type="math_number" x="13" y="10">
+        <title name="number">0</title>
+      </block>
+      <block type="math_random" x="14" y="44"></block>
+      <block type="math_equal" inline="true" x="-21" y="92">
+        <title name="cond">=</title>
+      </block>
+      <block type="math_in_between">
+        <value name="lower">
+          <block type="math_number">
+            <field name="number">0</field>
+          </block>
+        </value>
+        <value name="upper">
+          <block type="math_number">
+            <field name="number">100</field>
+          </block>
+        </value>
+      </block>
+      <block type="data_changevariableby">
+        <value name="VALUE">
+          <block type="math_number">
+            <field name="number">1</field>
+          </block>
+        </value>
+      </block>
+      <!-- <block type="variable_decrease_by">
+        <value name="increment">
+          <block type="math_number">
+            <field name="number">1</field>
+          </block>
+        </value>
+      </block> -->
+      <block type="math_operator" inline="true" x="28" y="147">
+        <title name="op">+</title>
+      </block>
+      <block type="math_andor" inline="true" x="35" y="202">
+        <title name="andor">and</title>
+      </block>
+      <block type="math_not" inline="false" x="42" y="257"></block>
+    </category>
+    <category name="Sensing" colour="#51CF91" secondaryColour="#00C853">
+      <block type="input_sensor" x="59" y="49">
+        <title name="sensor">1</title>
+      </block>
+      <block type="control_if">
+        <value name="condition">
+          <block type="math_equal">
+            <field name="cond">&gt;</field>
+            <value name="left">
+              <block type="input_sensor">
+                <field name="sensor">1</field>
+              </block>
+            </value>
+            <value name="right">
+              <block type="math_number">
+                <field name="number">500</field>
+              </block>
+            </value>
+          </block>
+        </value>
+      </block>
+    </category>
+    <category name="DC Motor" colour="#3A9FFE" secondaryColour="#7DDAFE">
+      <block type="action_motor" x="133" y="331"></block>
+      <block type="action_motor_is_on" x="133" y="331"></block>
+      <block type="action_motor_is_cw"></block>
+      <block type="motor_action_turn" x="122" y="51">
+        <title name="turn">on</title>
+      </block>
+      <!--<block type="motor_action_onfor" x="120" y="102"><title name="second">1</title></block>-->
+      <block type="motor_action_onfor">
+        <value name="value">
+          <block type="math_number">
+            <title name="number">1</title>
+          </block>
+        </value>
+      </block>
+      <block type="motor_action_thisway" x="119" y="159">
+        <title name="clockwise">cw</title>
+      </block>
+      <block type="motor_action_rd" x="116" y="214"></block>
+      <block type="motor_action_power" x="119" y="263">
+        <value name="power">
+          <block type="math_number">
+            <title name="number">100</title>
+          </block>
+        </value>
+      </block>
+    </category>
+    <category name="Servo Motor" colour="#5240FF" secondaryColour="#6D80FA">
+      <block type="action_motor" x="133" y="331"></block>
+      <block type="servo_seth" x="116" y="214">
+        <value name="heading">
+          <block type="math_number">
+            <title name="number">10</title>
+          </block>
+        </value>
+      </block>
+      <block type="servo_lt" x="116" y="214">
+        <value name="heading">
+          <block type="math_number">
+            <title name="number">10</title>
+          </block>
+        </value>
+      </block>
+      <block type="servo_rt" x="116" y="214">
+        <value name="heading">
+          <block type="math_number">
+            <title name="number">10</title>
+          </block>
+        </value>
+      </block>
+    </category>
+    <category name="Other Actions" colour="#EA80FC" secondaryColour="#A0F">
+      <block type="action_beep" x="133" y="62"></block>
+      <block type="action_led" x="132" y="115">
+        <title name="onoff">on</title>
+      </block>
+    </category>
+    <category name="Time" colour="#FF488D" secondaryColour="#FF105A">
+      <block type="action_wait">
+        <value name="NAME">
+          <block type="math_number">
+            <title name="number">1</title>
+          </block>
+        </value>
+      </block>
+      <block type="action_gettimer" x="136" y="231"></block>
+      <block type="action_reset_timer" x="136" y="280"></block>
+      <block type="action_settickrate">
+        <value name="NAME">
+          <block type="math_number">
+            <title name="number">10</title>
+          </block>
+        </value>
+      </block>
+      <block type="action_ticked"></block>
+      <block type="action_gettickcount"></block>
+      <block type="action_cleartick"></block>
+    </category>
+    <category name="Variables" colour="#03A9F4" secondaryColour="#80D8FF" custom="VARIABLE">
+    </category>
+    <category name="Procedures" colour="#1AFFC3" secondaryColour="#00DB88" custom="PROCEDURE"></category>
+    <!-- <category name="Infrared Remote Control" colour="#F0F0F0" secondaryColour="#FFFFFF">
+    </category>
+    <category name="Clock and Calendar Module" colour="#F0F0F0" secondaryColour="#FFFFFF">
+    </category>
+    <category name="Display Module" colour="#F0F0F0" secondaryColour="#FFFFFF">
+    </category>
+    <category name="Voice Recorder" colour="#F0F0F0" secondaryColour="#FFFFFF">
+    </category>
+    <category name="I2C Extension" colour="#F0F0F0" secondaryColour="#FFFFFF">
+    </category> -->
+    <!-- <category name="Events" colour="#FFD500" secondaryColour="#CC9900">
+      <block type="event_whenflagclicked" id="event_whenflagclicked"></block>
+      <block type="event_whenkeypressed" id="event_whenkeypressed">
+      </block>
+      <block type="event_whenthisspriteclicked" id="event_whenthisspriteclicked"></block>
+      <block type="event_whenbackdropswitchesto" id="event_whenbackdropswitchesto">
+      </block>
+      <block type="event_whengreaterthan" id="event_whengreaterthan">
+        <value name="VALUE">
+          <shadow type="math_number">
+            <field name="NUM">10</field>
+          </shadow>
+        </value>
+      </block>
+      <block type="event_whenbroadcastreceived" id="event_whenbroadcastreceived">
+      </block>
+      <block type="event_broadcast" id="event_broadcast">
+        <value name="BROADCAST_OPTION">
+          <shadow type="event_broadcast_menu"></shadow>
+        </value>
+      </block>
+      <block type="event_broadcastandwait" id="event_broadcastandwait">
+        <value name="BROADCAST_OPTION">
+          <shadow type="event_broadcast_menu"></shadow>
+        </value>
+      </block>
+    </category> -->
+
+  </xml>
+  <!-- Simple toolbox -->
+  <!-- <xml id="toolbox-simple" style="display: none">
+    <block type="operator_random">
+      <value name="FROM">
+        <shadow type="math_number">
+          <field name="NUM">1</field>
+        </shadow>
+      </value>
+      <value name="TO">
+        <shadow type="math_number">
+          <field name="NUM">10</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_lt">
+      <value name="OPERAND1">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+      <value name="OPERAND2">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_equals">
+      <value name="OPERAND1">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+      <value name="OPERAND2">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_gt">
+      <value name="OPERAND1">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+      <value name="OPERAND2">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_and"></block>
+    <block type="operator_or"></block>
+    <block type="operator_not"></block>
+    <block type="operator_join">
+      <value name="STRING1">
+        <shadow type="text">
+          <field name="TEXT">hello</field>
+        </shadow>
+      </value>
+      <value name="STRING2">
+        <shadow type="text">
+          <field name="TEXT">world</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_letter_of">
+      <value name="LETTER">
+        <shadow type="math_whole_number">
+          <field name="NUM">1</field>
+        </shadow>
+      </value>
+      <value name="STRING">
+        <shadow type="text">
+          <field name="TEXT">world</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_length">
+      <value name="STRING">
+        <shadow type="text">
+          <field name="TEXT">world</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_mod">
+      <value name="NUM1">
+        <shadow type="math_number">
+          <field name="NUM"></field>
+        </shadow>
+      </value>
+      <value name="NUM2">
+        <shadow type="math_number">
+          <field name="NUM"></field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_round">
+      <value name="NUM">
+        <shadow type="math_number">
+          <field name="NUM"></field>
+        </shadow>
+      </value>
+    </block>
+    <block type="operator_mathop">
+      <value name="OPERATOR">
+        <shadow type="operator_mathop_menu"></shadow>
+      </value>
+      <value name="NUM">
+        <shadow type="math_number">
+          <field name="NUM"></field>
+        </shadow>
+      </value>
+    </block>
+  </xml> -->
+
+
+
+  <!-- <hr>
+
+  <p>
+    Log events: &nbsp;
+    <input type="checkbox" onclick="logEvents(this.checked)" id="logCheck">
+  </p>
+
+  <p>
+    Stress test: &nbsp;
+    <input type="button" value="Sprinkles!" onclick="sprinkles(100)">
+    <input type="button" value="Spaghetti!" onclick="spaghetti(3)">
+    <input type="button" value="Fake some drags!" onclick="fakeManyDrags()">
+  </p>
+
+  <p>
+    Glows: &nbsp;
+    <input type="button" value="Glow last clicked block" onclick="glowBlock()" />
+    <input type="button" value="Unglow last clicked block" onclick="unglowBlock()" />
+    <input type="button" value="Stack glow last clicked block" onclick="glowStack()" />
+    <input type="button" value="Stack unglow last clicked block" onclick="unglowStack()" />
+  </p>
+
+  <p>
+    Log flyout events: &nbsp;
+    <input type="checkbox" onclick="logFlyoutEvents(this.checked)" id="logFlyoutCheck">
+  </p> -->
+
+  <!-- <p>
+    Enable sounds (after refresh): &nbsp;
+    <input type="checkbox" onclick="setSoundsEnabled(this.checked)" id="soundsEnabled">
+  </p>
+
+  <p>
+    <input type="button" value="Undo" onclick="workspace.undo()" />
+    <input type="button" value="Redo" onclick="workspace.undo(true)" />
+  </p> -->
+
+  <!-- <p>
+    Report:
+    <input id="reportValue" type="text" value="123" />
+    <input type="button" value="Report last clicked block" onclick="reportDemo()" />
+  </p> -->
+</body>
+<script>
+    document.getElementById("block").click();
+
+</script>
+
+</html>
